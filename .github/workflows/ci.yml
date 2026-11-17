@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  HIGHS_VERSION: '1.16.0'
+  HIGHS_TAG: 'v1.16.0'
+  HIGHS_ASSET: 'highs-1.16.0-x86_64-linux-gnu-static-mit.tar.gz'
+
+jobs:
+  build-and-test:
+    name: Build and test with HiGHS
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends cmake g++ zlib1g-dev
+
+      - name: Restore cached HiGHS SDK
+        id: cache-highs
+        uses: actions/cache@v4
+        with:
+          path: ${{ github.workspace }}/.deps/highs
+          key: ${{ runner.os }}-highs-${{ env.HIGHS_VERSION }}-static-mit-v1
+
+      - name: Download HiGHS SDK
+        if: steps.cache-highs.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          mkdir -p "${GITHUB_WORKSPACE}/.deps/highs"
+          curl -fL --retry 3 --retry-delay 5 \
+            -o /tmp/highs-sdk.tar.gz \
+            "https://github.com/ERGO-Code/HiGHS/releases/download/${HIGHS_TAG}/${HIGHS_ASSET}"
+          tar -xzf /tmp/highs-sdk.tar.gz -C "${GITHUB_WORKSPACE}/.deps/highs"
+          test -f "${GITHUB_WORKSPACE}/.deps/highs/lib/cmake/highs/highs-config.cmake"
+
+      - name: Configure
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_PREFIX_PATH="${GITHUB_WORKSPACE}/.deps/highs"
+
+      - name: Build
+        run: cmake --build build --parallel 2
+
+      - name: Test (CTest)
+        run: ctest --test-dir build --output-on-failure
+
+      - name: CLI smoke test
+        run: ./build/highs_cli data/example.lpdat

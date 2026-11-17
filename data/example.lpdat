@@ -1,0 +1,22 @@
+# HiGHS data interface example
+# max 3x + 2y
+# s.t. 2x + y <= 100
+#      x + y <= 80
+#      x      <= 40
+#      x, y >= 0
+# Optimum: (20, 60), objective 180.
+#
+# A is stored column-wise:
+#   column x -> rows (0, 1, 2) with values (2, 1, 1)
+#   column y -> rows (0, 1)    with values (1, 1)
+sense maximize
+num_col 2
+num_row 3
+col_cost 3 2
+col_lower 0 0
+col_upper inf inf
+row_lower -inf -inf -inf
+row_upper 100 80 40
+a_start 0 3 5
+a_index 0 1 2 0 1
+a_value 2 1 1 1 1
